@@ -8,7 +8,7 @@ This library has been designed to be <b>ultra high level</b> and <b>simple</b> <
 
 ```rust
 extern crate gmailnator;
-use gmailnator::mail::GmailnatorInbox;
+use gmailnator::GmailnatorInbox;
 ...
 let inbox = GmailnatorInbox::new().expect("Error occured when creating the inbox.");
 ```

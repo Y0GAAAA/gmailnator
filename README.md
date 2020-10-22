@@ -1,6 +1,8 @@
+[![Generic badge](https://img.shields.io/crates/l/gmailnator)]() [![Generic badge](https://img.shields.io/crates/v/gmailnator)]()
+
 # Goals
 
-This library has been designed to be <b>ultra high level</b> and <b>simple</b> <i>(see the examples below)</i>. Performance has been taken in account but the host's slowness in a real bottleneck.
+This library has been designed to be <b>ultra high level</b> and <b>simple</b>, see the examples below.
 
 # Examples
 

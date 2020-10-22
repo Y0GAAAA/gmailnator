@@ -27,7 +27,7 @@ let messages = inbox.get_messages().expect("Failed to retrieve messages.");
 for message in messages {
 
     let title = message.get_title();
-    let body = message.get_content();
+    let body = message.get_raw_content();
 
     println!("Title : {}\nBody : {}", title, body);
 

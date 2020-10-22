@@ -26,8 +26,9 @@ pub type GmailnatorError = ();
 /// assert!(subject.is_empty());
 /// assert!(content.is_empty());
 /// ```
+#[derive(Debug)]
 pub struct MailMessage {
-    object:String,
+    subject:String,
     content:String,
 }
 
@@ -40,8 +41,8 @@ lazy_static! {
 
 impl MailMessage {
 
-    pub(crate) fn from(object:String, content:String) -> Self {
-        Self { object, content }
+    pub(crate) fn from(subject:String, content:String) -> Self {
+        Self { subject, content }
     }
 
     pub(crate) fn parse(response_fragment:&str) -> Result<Self, GmailnatorError> {
@@ -68,14 +69,14 @@ impl MailMessage {
     /// Returns an empty mail message.
     pub fn empty() -> Self {
         Self {
-            object:String::default(),
+            subject:String::default(),
             content:String::default(),
         }
     }
 
     /// Gets the message's subject.
     pub fn get_subject(&self) -> &str {
-        &self.object
+        &self.subject
     }
 
     /// Gets the message's raw content.

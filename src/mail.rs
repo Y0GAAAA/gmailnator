@@ -3,6 +3,7 @@ extern crate scraper;
 use crate::endpoint;
 use crate::regexes;
 use crate::httphelper;
+use crate::errors::GmailnatorError;
 
 use scraper::{Html, Selector};
 
@@ -11,8 +12,7 @@ use httphelper::UrlQuery;
 use endpoint::*;
 use regexes::*;
 
-/// An empty error type.
-pub type GmailnatorError = ();
+pub type Error = GmailnatorError;
 
 /// A structure that contains an e-mail subject and it's raw content, which can be accessed by the following two functions :
 /// ```
@@ -45,7 +45,7 @@ impl MailMessage {
         Self { subject, content }
     }
 
-    pub(crate) fn parse(response_fragment:&str) -> Result<Self, GmailnatorError> {
+    pub(crate) fn parse(response_fragment:&str) -> Result<Self, ()> {
 
         let fragment = Html::parse_fragment(response_fragment);
 
@@ -100,7 +100,7 @@ pub struct GmailnatorInbox {
 impl GmailnatorInbox {
 
     /// Creates a new inbox. 
-    pub fn new() -> Result<Self, GmailnatorError> {
+    pub fn new() -> Result<Self, Error> {
 
         let token = GmailnatorInbox::get_new_token()?;
 
@@ -119,12 +119,17 @@ impl GmailnatorInbox {
         let email_response = email_request.send_string(&mail_query.to_query_string());
 
         if email_response.error() {
-            return Err(());
+            return Err(GmailnatorError::ServerError(email_response.status()));
         }
 
         let response_str = email_response.into_string().unwrap();
 
         let server_id:Vec<&str> = response_str.split('+').collect();
+
+        if server_id.is_empty() {
+            return Err(GmailnatorError::MailServerParsingError(response_str.to_string()));
+        }
+
         let server_id = server_id[0].to_string();
 
         Ok(
@@ -138,7 +143,7 @@ impl GmailnatorInbox {
     }
 
     /// Returns the received e-mail(s).
-    pub fn get_messages(&self) -> Result<Vec<MailMessage>, GmailnatorError> {
+    pub fn get_messages(&self) -> Result<Vec<MailMessage>, Error> {
 
         let mut inbox_request = get_request_from_endpoint(
                                     GmailnatorEndpoint::GetInbox, 
@@ -154,7 +159,7 @@ impl GmailnatorInbox {
 
         let inbox_response = inbox_request.send_string(&query.to_query_string());
 
-        if inbox_response.error() { return Err(()); }
+        if inbox_response.error() { return Err(GmailnatorError::ServerError(inbox_response.status())); }
 
         let response_str = inbox_response.into_string().unwrap();
 
@@ -182,13 +187,13 @@ impl GmailnatorInbox {
         &self.mail_address
     }
 
-    fn get_new_token() -> Result<String, GmailnatorError> {
+    fn get_new_token() -> Result<String, Error> {
 
         let mut main_page_request = get_request_from_endpoint(GmailnatorEndpoint::GetToken, None);
 
         let response = main_page_request.call();
 
-        if response.error() { return Err(()); }
+        if response.error() { return Err(GmailnatorError::ServerError(response.status())); }
 
         let set_cookie_value = response.header("Set-Cookie").unwrap();
 
@@ -200,11 +205,11 @@ impl GmailnatorInbox {
             }
         }
 
-        Err(())
+        Err(GmailnatorError::TokenParsingError(set_cookie_value.to_string()))
 
     }
 
-    fn get_message_by_id(&self, message_id:&str) -> Result<MailMessage, GmailnatorError> {
+    fn get_message_by_id(&self, message_id:&str) -> Result<MailMessage, ()> {
 
         let mut get_message_request = get_request_from_endpoint(GmailnatorEndpoint::GetMessage, Some(&self.csrf_token));
 

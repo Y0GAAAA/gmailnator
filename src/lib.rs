@@ -5,25 +5,29 @@
 //! The main struct is the [`GmailnatorInbox`] struct, one instance contains one inbox associated to an email address.
 //! 
 //! This creates a new temporary gmail address :
-//! ```no_run
+//! ```
 //! use gmailnator::GmailnatorInbox;
 //! 
 //! let inbox = GmailnatorInbox::new().unwrap();
 //! ```
 //! 
 //! To get the associated mail address :
-//! ```ignore
+//! ```
+//! # use gmailnator::GmailnatorInbox;
+//! # let inbox = GmailnatorInbox::new().unwrap();
 //! let address:&str = inbox.get_address();
 //! ```
 //! 
 //! To retrieve messages and display them via the container struct [`MailMessage`]: 
-//! ```ignore
+//! ```
+//! use gmailnator::{GmailnatorInbox, MailMessage};
+//! # let inbox = GmailnatorInbox::new().unwrap();
 //! let messages:Vec<MailMessage> = inbox.get_messages().expect("Failed to retrieve messages.");
 //! 
 //! for message in messages {
 //! 
-//!     let title = message.get_title();
-//!     let body = message.get_content();
+//!     let title = message.get_subject();
+//!     let body = message.get_raw_content();
 //! 
 //!     println!("Title : {}\nBody : {}", title, body);
 //! 
@@ -36,12 +40,14 @@
 #[macro_use]
 extern crate lazy_static;
 
+mod errors;
 mod mail;
 mod endpoint;
 mod regexes;
 mod httphelper;
 
-pub use mail::{MailMessage, GmailnatorInbox, GmailnatorError};
+pub use mail::{MailMessage, GmailnatorInbox, Error};
+pub use errors::GmailnatorError;
 
 #[cfg(test)]
 mod tests {

@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-/// Default error type for the crate.
+/// Default error enum for the crate, containing all the potential errors.
 #[derive(Debug)]
 pub enum GmailnatorError {
 

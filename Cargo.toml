@@ -1,6 +1,6 @@
 [package]
 name = "gmailnator"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Y0GAAAA <35837405+Y0GAAAA@users.noreply.github.com>"]
 description = "An unofficial api wrapper to interact with https://gmailnator.com/"
 keywords = ["gmailnator", "gmail", "tempmail"]

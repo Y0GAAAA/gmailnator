@@ -12,6 +12,7 @@ use httphelper::UrlQuery;
 use endpoint::*;
 use regexes::*;
 
+/// Default error for the crate.
 pub type Error = GmailnatorError;
 
 /// A structure that contains an e-mail subject and it's raw content, which can be accessed by the following two functions :

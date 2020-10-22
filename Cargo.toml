@@ -1,6 +1,6 @@
 [package]
 name = "gmailnator"
-version = "1.0.0"
+version = "0.1.0"
 authors = ["Y0GAAAA <35837405+Y0GAAAA@users.noreply.github.com>"]
 description = "An unofficial api wrapper to interact with https://gmailnator.com/"
 keywords = ["gmailnator", "gmail", "tempmail"]
@@ -8,8 +8,6 @@ categories = ["api-bindings", "email"]
 license = "GPL-3.0-only"
 repository = "https://github.com/Y0GAAAA/gmailnator"
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 ureq = "1.5.1"

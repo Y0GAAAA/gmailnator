@@ -45,6 +45,7 @@ mod mail;
 mod endpoint;
 mod regexes;
 mod http;
+mod token;
 
 pub use mail::{MailMessage, GmailnatorInbox, Error};
 pub use errors::GmailnatorError;

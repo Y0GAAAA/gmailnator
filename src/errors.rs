@@ -16,6 +16,12 @@ pub enum GmailnatorError {
     
 }
 
+impl GmailnatorError {
+
+ 
+
+}
+
 impl Error for GmailnatorError {}
 
 impl fmt::Display for GmailnatorError {

@@ -1,17 +1,13 @@
 extern crate scraper;
 
-use crate::endpoint;
-use crate::regexes;
-use crate::http;
+use crate::endpoint::*;
+use crate::regexes::{CSRF_REGEX, MAIL_ID_REGEX};
+use crate::http::{UrlQuery, get_error, EXPIRED_TOKEN};
 use crate::errors::GmailnatorError;
+use crate::token::{CSRF_TOKEN, renew_token};
 
 use scraper::{Html, Selector};
  
-use http::UrlQuery;
-
-use endpoint::*;
-use regexes::*;
-
 /// Default error for the crate.
 pub type Error = GmailnatorError;
 
@@ -94,8 +90,6 @@ pub struct GmailnatorInbox {
     mail_address:String,    //COMPLETE E-MAIL | Ex : extmp+blabla@gmail.com
     temp_server:String,     //SERVER ID       | Ex : extmp
 
-    csrf_token:String,      //Cross site request forgery token | Ex : 0732953026e73c6631577d6b5d019788
-
 }
 
 impl GmailnatorInbox {
@@ -103,23 +97,18 @@ impl GmailnatorInbox {
     /// Creates a new inbox. 
     pub fn new() -> Result<Self, Error> {
 
-        let token = GmailnatorInbox::get_new_token()?;
-
-        let mut email_request = get_request_from_endpoint(
-                                GmailnatorEndpoint::GetEmail, 
-                                Some(&token)
-                            );
-
-        let mut mail_query = UrlQuery::new(); 
+        renew_token(false).expect("Could not renew token.");
         
-        mail_query.add("csrf_gmailnator_token", &token);
+        let mut email_request = get_request_from_endpoint(GmailnatorEndpoint::GetEmail);
+        let mut mail_query = GmailnatorInbox::get_tokened_query();
+        
         mail_query.add("action", "GenerateEmail");
         mail_query.add("data%5B%5D", "2");
 
         let email_response = email_request.send_string(&mail_query.to_query_string());
 
-        if email_response.error() {
-            return Err(GmailnatorError::ServerError(email_response.status()));
+        if let Some(error_code) = get_error(&email_response) {
+            return Err(GmailnatorError::ServerError(error_code));
         }
 
         let response_str = email_response.into_string().unwrap();
@@ -130,28 +119,25 @@ impl GmailnatorInbox {
             Self {
                 mail_address:response_str,
                 temp_server:server_id,
-                csrf_token:token
             }
         )
 
     }
 
-    /// Creates a new inbox from an already existing gmailnator address. 
+    /// Creates a new inbox from an  already existing gmailnator address. 
     /// Warning : an invalid address will not return an Error.
     /// ```
     /// # use gmailnator::GmailnatorInbox;
-    /// let valid   = GmailnatorInbox::from_address("deedtmp+[...]@gmail.com").unwrap();    // Valid
-    /// let invalid = GmailnatorInbox::from_address("invalid.email@gmail.com").unwrap();    // Invalid, but will not throw an error.
+    /// let valid   = GmailnatorInbox::from_address("deedtmp+[...]@gmail.com").unwrap();
+    /// let invalid = GmailnatorInbox::from_address("invalid.email@gmail.com").unwrap();
     /// ```
     pub fn from_address(address:&str) -> Result<Self, Error> {
 
-        let token = GmailnatorInbox::get_new_token()?;
         let temp_server_id = GmailnatorInbox::get_temp_server_id(address)?;
 
         Ok(Self {
             mail_address:address.to_string(),
             temp_server:temp_server_id,
-            csrf_token:token,
         })
 
     }
@@ -159,23 +145,24 @@ impl GmailnatorInbox {
     /// Returns the received e-mail(s).
     pub fn get_messages(&self) -> Result<Vec<MailMessage>, Error> {
 
-        let mut inbox_request = get_request_from_endpoint(
-                                    GmailnatorEndpoint::GetInbox, 
-                                    Some(&self.csrf_token)
-                                );
+        let mut inbox_request = get_request_from_endpoint(GmailnatorEndpoint::GetInbox);
 
-        let mut query = self.get_tokened_query();
+        let mut query = GmailnatorInbox::get_tokened_query();
         
         query.add("action", "LoadMailList");
         query.add("Email_address", &self.mail_address);
 
-        let mut inbox_messages:Vec<MailMessage> = Vec::new();
-
         let inbox_response = inbox_request.send_string(&query.to_query_string());
 
-        if inbox_response.error() { return Err(GmailnatorError::ServerError(inbox_response.status())); }
+        if let Some(error_code) = get_error(&inbox_response) {
+
+            return Err(GmailnatorError::ServerError(error_code));
+        
+        }
 
         let response_str = inbox_response.into_string().unwrap();
+
+        let mut inbox_messages:Vec<MailMessage> = Vec::new();
 
         for id in MAIL_ID_REGEX.captures_iter(&response_str)
                                     .map(|capture| capture.get(1).unwrap()) {
@@ -201,9 +188,9 @@ impl GmailnatorInbox {
         &self.mail_address
     }
 
-    fn get_new_token() -> Result<String, Error> {
+    pub(crate)fn get_new_token() -> Result<String, Error> {
 
-        let mut main_page_request = get_request_from_endpoint(GmailnatorEndpoint::GetToken, None);
+        let mut main_page_request = get_request_from_endpoint(GmailnatorEndpoint::GetToken);
 
         let response = main_page_request.call();
 
@@ -225,9 +212,9 @@ impl GmailnatorInbox {
 
     fn get_message_by_id(&self, message_id:&str) -> Result<MailMessage, ()> {
 
-        let mut get_message_request = get_request_from_endpoint(GmailnatorEndpoint::GetMessage, Some(&self.csrf_token));
+        let mut get_message_request = get_request_from_endpoint(GmailnatorEndpoint::GetMessage);
 
-        let mut get_message_query = self.get_tokened_query();
+        let mut get_message_query = GmailnatorInbox::get_tokened_query();
 
         get_message_query.add("action", "get_message");
         get_message_query.add("message_id", message_id);
@@ -243,11 +230,18 @@ impl GmailnatorInbox {
 
     }
 
-    fn get_tokened_query(&self) -> UrlQuery {
+    fn get_tokened_query() -> UrlQuery {
+
+        let guard = CSRF_TOKEN.lock().unwrap();
+        let guard_value = guard.as_ref();
 
         let mut tokened_query = UrlQuery::new();
 
-        tokened_query.add("csrf_gmailnator_token", &self.csrf_token);
+        if guard_value.is_none() {
+            return tokened_query;   
+        }
+
+        tokened_query.add("csrf_gmailnator_token", &guard_value.unwrap());
 
         tokened_query
 

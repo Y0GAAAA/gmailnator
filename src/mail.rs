@@ -2,12 +2,12 @@ extern crate scraper;
 
 use crate::endpoint;
 use crate::regexes;
-use crate::httphelper;
+use crate::http;
 use crate::errors::GmailnatorError;
 
 use scraper::{Html, Selector};
-
-use httphelper::UrlQuery;
+ 
+use http::UrlQuery;
 
 use endpoint::*;
 use regexes::*;
@@ -114,7 +114,6 @@ impl GmailnatorInbox {
         
         mail_query.add("csrf_gmailnator_token", &token);
         mail_query.add("action", "GenerateEmail");
-
         mail_query.add("data%5B%5D", "2");
 
         let email_response = email_request.send_string(&mail_query.to_query_string());
@@ -125,13 +124,7 @@ impl GmailnatorInbox {
 
         let response_str = email_response.into_string().unwrap();
 
-        let server_id:Vec<&str> = response_str.split('+').collect();
-
-        if server_id.is_empty() {
-            return Err(GmailnatorError::MailServerParsingError(response_str.to_string()));
-        }
-
-        let server_id = server_id[0].to_string();
+        let server_id = GmailnatorInbox::get_temp_server_id(&response_str)?;
 
         Ok(
             Self {
@@ -140,6 +133,26 @@ impl GmailnatorInbox {
                 csrf_token:token
             }
         )
+
+    }
+
+    /// Creates a new inbox from an already existing gmailnator address. 
+    /// Warning : an invalid address will not return an Error.
+    /// ```
+    /// # use gmailnator::GmailnatorInbox;
+    /// let valid   = GmailnatorInbox::from_address("deedtmp+[...]@gmail.com").unwrap();    // Valid
+    /// let invalid = GmailnatorInbox::from_address("invalid.email@gmail.com").unwrap();    // Invalid, but will not throw an error.
+    /// ```
+    pub fn from_address(address:&str) -> Result<Self, Error> {
+
+        let token = GmailnatorInbox::get_new_token()?;
+        let temp_server_id = GmailnatorInbox::get_temp_server_id(address)?;
+
+        Ok(Self {
+            mail_address:address.to_string(),
+            temp_server:temp_server_id,
+            csrf_token:token,
+        })
 
     }
 
@@ -237,6 +250,20 @@ impl GmailnatorInbox {
         tokened_query.add("csrf_gmailnator_token", &self.csrf_token);
 
         tokened_query
+
+    }
+
+    fn get_temp_server_id(mail_address:&str) -> Result<String, Error> {
+
+        let server_id:Vec<&str> = mail_address.split('+').collect();
+
+        if server_id.is_empty() {
+            return Err(GmailnatorError::MailServerParsingError(mail_address.to_string()));
+        }
+
+        let server_id = server_id[0].to_string();
+
+        Ok(server_id)
 
     }
 

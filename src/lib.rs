@@ -44,7 +44,7 @@ mod errors;
 mod mail;
 mod endpoint;
 mod regexes;
-mod httphelper;
+mod http;
 
 pub use mail::{MailMessage, GmailnatorInbox, Error};
 pub use errors::GmailnatorError;
@@ -75,6 +75,18 @@ mod tests {
         let messages = inbox.get_messages().expect("Failed to retrieve messages.");
 
         assert_eq!(messages.len(), 0);
+
+    }
+
+    #[test]
+    fn create_inbox_from_existing_address() {
+
+        let new_address = GmailnatorInbox::new().unwrap();
+        let new_address = new_address.get_address();
+        
+        let inbox = GmailnatorInbox::from_address(new_address).unwrap();
+
+        assert_eq!(inbox.get_address(), new_address);
 
     }
 

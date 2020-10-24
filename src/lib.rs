@@ -89,6 +89,6 @@ mod tests {
 
         assert_eq!(inbox.get_address(), new_address);
 
-    }
+    }  
 
 }

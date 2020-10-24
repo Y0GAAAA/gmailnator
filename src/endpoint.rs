@@ -2,7 +2,7 @@ extern crate ureq;
 
 use ureq::Request;
 
-use crate::token::CSRF_TOKEN;
+use crate::token::get_token_sync;
 
 impl GmailnatorEndpoint { //IMPLEMENT EP
 
@@ -75,12 +75,11 @@ pub fn get_request_from_endpoint(ep:GmailnatorEndpoint) -> Request {
 
     };
 
-    let guard = CSRF_TOKEN.lock().unwrap();
-    let guard_value = guard.as_ref();
+    let csrf_value = get_token_sync();
 
-    if ep != GmailnatorEndpoint::GetToken && guard_value.is_some() {
+    if ep != GmailnatorEndpoint::GetToken && csrf_value.is_some() {
 
-        let auth_cookie = format!("csrf_gmailnator_cookie={}", guard_value.unwrap());
+        let auth_cookie = format!("csrf_gmailnator_cookie={}", csrf_value.unwrap());
 
         base_req.set("Cookie", &auth_cookie);
 

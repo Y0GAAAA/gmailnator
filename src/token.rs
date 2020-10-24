@@ -9,9 +9,19 @@ lazy_static!{
 
 }
 
-/// Returns the current token value, returning a String instead of an 
-/// Option<String> shouldn't be a problem since we don't access 
+pub fn get_token_sync() -> Option<String> {
 
+    let guard = CSRF_TOKEN.lock().unwrap();
+
+    if guard.is_some() {
+
+        return Some(guard.as_ref().unwrap().to_string());
+
+    }
+
+    None
+
+}
 
 pub fn set_token_sync(token:String) {
 
@@ -23,22 +33,14 @@ pub fn set_token_sync(token:String) {
 
 pub fn renew_token(overwrite:bool) -> Result<(), Error> {
 
-    if CSRF_TOKEN.lock().unwrap().is_some() && !overwrite {
+    if get_token_sync().is_some() && !overwrite {
         return Ok(());
     }
 
-    let token_result = GmailnatorInbox::get_new_token();
+    let token = GmailnatorInbox::get_new_token()?;
 
-    if let Ok(token) = token_result {
+    set_token_sync(token);
 
-        set_token_sync(token);
-
-        Ok(())
-
-    } else {
-
-        Err(token_result.unwrap_err())
-
-    }
+    Ok(())
 
 }

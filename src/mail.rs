@@ -4,7 +4,7 @@ use crate::endpoint::*;
 use crate::regexes::{CSRF_REGEX, MAIL_ID_REGEX};
 use crate::http::{UrlQuery, get_error, EXPIRED_TOKEN};
 use crate::errors::GmailnatorError;
-use crate::token::{CSRF_TOKEN, renew_token};
+use crate::token::{renew_token, get_token_sync};
 
 use scraper::{Html, Selector};
  
@@ -97,30 +97,41 @@ impl GmailnatorInbox {
     /// Creates a new inbox. 
     pub fn new() -> Result<Self, Error> {
 
-        renew_token(false).expect("Could not renew token.");
+        renew_token(false)?;
         
         let mut email_request = get_request_from_endpoint(GmailnatorEndpoint::GetEmail);
         let mut mail_query = GmailnatorInbox::get_tokened_query();
         
         mail_query.add("action", "GenerateEmail");
         mail_query.add("data%5B%5D", "2");
-
+ 
         let email_response = email_request.send_string(&mail_query.to_query_string());
 
         if let Some(error_code) = get_error(&email_response) {
-            return Err(GmailnatorError::ServerError(error_code));
+            if error_code == EXPIRED_TOKEN {
+            
+                renew_token(true)?;
+            
+                return GmailnatorInbox::new();
+
+            } else {
+
+                return Err(GmailnatorError::ServerError(error_code));
+
+            }
+
         }
 
         let response_str = email_response.into_string().unwrap();
 
         let server_id = GmailnatorInbox::get_temp_server_id(&response_str)?;
 
-        Ok(
+        return Ok(
             Self {
                 mail_address:response_str,
                 temp_server:server_id,
             }
-        )
+        );
 
     }
 
@@ -132,6 +143,8 @@ impl GmailnatorInbox {
     /// let invalid = GmailnatorInbox::from_address("invalid.email@gmail.com").unwrap();
     /// ```
     pub fn from_address(address:&str) -> Result<Self, Error> {
+
+        renew_token(false)?;
 
         let temp_server_id = GmailnatorInbox::get_temp_server_id(address)?;
 
@@ -156,7 +169,17 @@ impl GmailnatorInbox {
 
         if let Some(error_code) = get_error(&inbox_response) {
 
-            return Err(GmailnatorError::ServerError(error_code));
+            if error_code == EXPIRED_TOKEN {
+
+                renew_token(true)?;
+
+                return self.get_messages();
+
+            } else {
+
+                return Err(GmailnatorError::ServerError(error_code));
+
+            }
         
         }
 
@@ -232,16 +255,15 @@ impl GmailnatorInbox {
 
     fn get_tokened_query() -> UrlQuery {
 
-        let guard = CSRF_TOKEN.lock().unwrap();
-        let guard_value = guard.as_ref();
+        let csrf_value = get_token_sync(); 
 
         let mut tokened_query = UrlQuery::new();
 
-        if guard_value.is_none() {
+        if csrf_value.is_none() {
             return tokened_query;   
         }
 
-        tokened_query.add("csrf_gmailnator_token", &guard_value.unwrap());
+        tokened_query.add("csrf_gmailnator_token", &csrf_value.unwrap());
 
         tokened_query
 

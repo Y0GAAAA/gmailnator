@@ -4,8 +4,6 @@ extern crate ureq;
 use url::form_urlencoded::byte_serialize;
 use ureq::Response;
 
-pub const EXPIRED_TOKEN:u16 = 403; 
-
 pub fn url_encode(s:&str) -> String {
 
     let encoded:String = byte_serialize(s.as_bytes()).collect();

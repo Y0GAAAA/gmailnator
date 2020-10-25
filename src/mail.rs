@@ -1,13 +1,15 @@
 extern crate scraper;
 
 use crate::endpoint::*;
-use crate::regexes::{CSRF_REGEX, MAIL_ID_REGEX};
-use crate::http::{UrlQuery, get_error, EXPIRED_TOKEN};
+use crate::regexes::MAIL_ID_REGEX;
+use crate::http::{UrlQuery, get_error};
 use crate::errors::GmailnatorError;
-use crate::token::{renew_token, get_token_sync};
 
 use scraper::{Html, Selector};
  
+const MIN_BULK_COUNT:u32 = 1;
+const MAX_BULK_COUNT:u32 = 1000;
+
 /// Default error for the crate.
 pub type Error = GmailnatorError;
 
@@ -34,6 +36,8 @@ lazy_static! {
     static ref SUBJECT_SELECTOR:Selector = Selector::parse("b").unwrap();
     static ref BODY_SELECTOR:Selector = Selector::parse("div:nth-child(4)").unwrap();
 
+    static ref BULK_EMAIL_SELECTOR:Selector = Selector::parse("#email-list-message > a").unwrap();
+
 }
 
 impl MailMessage {
@@ -42,7 +46,7 @@ impl MailMessage {
         Self { subject, content }
     }
 
-    pub(crate) fn parse(response_fragment:&str) -> Result<Self, ()> {
+    pub(crate) fn parse(response_fragment:&str) -> Result<Self, Error> {
 
         let fragment = Html::parse_fragment(response_fragment);
 
@@ -53,7 +57,7 @@ impl MailMessage {
         let body_item = body_container.next();
 
         if subject_item.is_none() || body_item.is_none() {
-            return Err(());
+            return Err(Error::HtmlParsingError(response_fragment.to_string()));
         }
 
         let subject = subject_item.unwrap().inner_html();
@@ -96,8 +100,6 @@ impl GmailnatorInbox {
 
     /// Creates a new inbox. 
     pub fn new() -> Result<Self, Error> {
-
-        renew_token(false)?;
         
         let mut email_request = get_request_from_endpoint(GmailnatorEndpoint::GetEmail);
         let mut mail_query = GmailnatorInbox::get_tokened_query();
@@ -108,17 +110,8 @@ impl GmailnatorInbox {
         let email_response = email_request.send_string(&mail_query.to_query_string());
 
         if let Some(error_code) = get_error(&email_response) {
-            if error_code == EXPIRED_TOKEN {
-            
-                renew_token(true)?;
-            
-                return GmailnatorInbox::new();
-
-            } else {
-
-                return Err(GmailnatorError::ServerError(error_code));
-
-            }
+        
+            return Err(Error::ServerError(error_code));
 
         }
 
@@ -135,16 +128,43 @@ impl GmailnatorInbox {
 
     }
 
+    /// Creates the desired amount of inbox.
+    /// The `count` argument must be between 1 and 1000 included. 
+    pub fn new_bulk(count:u32) -> Result<Vec<Self>, Error> {
+
+        if count < MIN_BULK_COUNT || count > MAX_BULK_COUNT {
+            return Err(Error::InvalidCountError(count));
+        }
+
+        let mut bulk_request = get_request_from_endpoint(GmailnatorEndpoint::GetEmailBulk);
+
+        let mut bulk_query = GmailnatorInbox::get_tokened_query();
+
+        bulk_query.add("email_list", &(count - 1).to_string());
+        bulk_query.add("email%5B%5D", "2");
+
+        let bulk_response = bulk_request.send_string(&bulk_query.to_query_string());
+
+        if let Some(error_code) = get_error(&bulk_response) {
+
+            return Err(Error::ServerError(error_code));
+
+        }
+
+        let response_str = bulk_response.into_string().unwrap();
+
+        GmailnatorInbox::get_bulk_from_html(&response_str)
+        
+    }
+
     /// Creates a new inbox from an  already existing gmailnator address. 
-    /// Warning : an invalid address will not return an Error.
+    /// Warning : an invalid gmailnator address will not return an Error.
     /// ```
     /// # use gmailnator::GmailnatorInbox;
     /// let valid   = GmailnatorInbox::from_address("deedtmp+[...]@gmail.com").unwrap();
     /// let invalid = GmailnatorInbox::from_address("invalid.email@gmail.com").unwrap();
     /// ```
     pub fn from_address(address:&str) -> Result<Self, Error> {
-
-        renew_token(false)?;
 
         let temp_server_id = GmailnatorInbox::get_temp_server_id(address)?;
 
@@ -169,18 +189,8 @@ impl GmailnatorInbox {
 
         if let Some(error_code) = get_error(&inbox_response) {
 
-            if error_code == EXPIRED_TOKEN {
+            return Err(Error::ServerError(error_code));
 
-                renew_token(true)?;
-
-                return self.get_messages();
-
-            } else {
-
-                return Err(GmailnatorError::ServerError(error_code));
-
-            }
-        
         }
 
         let response_str = inbox_response.into_string().unwrap();
@@ -211,29 +221,31 @@ impl GmailnatorInbox {
         &self.mail_address
     }
 
-    pub(crate)fn get_new_token() -> Result<String, Error> {
+    fn get_bulk_from_html(html:&str) -> Result<Vec<Self>, Error> {
 
-        let mut main_page_request = get_request_from_endpoint(GmailnatorEndpoint::GetToken);
+        let document = Html::parse_document(html);
+        let mut emails = document.select(&BULK_EMAIL_SELECTOR);
 
-        let response = main_page_request.call();
+        let mut inbox_list = Vec::<Self>::new();
 
-        if response.error() { return Err(GmailnatorError::ServerError(response.status())); }
+        while let Some(mail_item) = emails.next() {
 
-        let set_cookie_value = response.header("Set-Cookie").unwrap();
+            let address = mail_item.text().next().unwrap();
+            let inbox_res = Self::from_address(&address);
 
-        if let Some(match_groups) = CSRF_REGEX.captures(set_cookie_value) {
-            if let Some(final_token) = match_groups.get(1) {
-                
-                return Ok(final_token.as_str().to_string());
+            if let Ok(inbox) = inbox_res {
+
+                inbox_list.push(inbox);
 
             }
+
         }
 
-        Err(GmailnatorError::TokenParsingError(set_cookie_value.to_string()))
+        Ok(inbox_list)
 
     }
 
-    fn get_message_by_id(&self, message_id:&str) -> Result<MailMessage, ()> {
+    fn get_message_by_id(&self, message_id:&str) -> Result<MailMessage, Error> {
 
         let mut get_message_request = get_request_from_endpoint(GmailnatorEndpoint::GetMessage);
 
@@ -245,8 +257,10 @@ impl GmailnatorInbox {
 
         let message_response = get_message_request.send_string(&get_message_query.to_query_string());
 
-        if message_response.error() { return Err(()); }
-
+        if let Some(error_code) = get_error(&message_response) {
+            return Err(Error::ServerError(error_code));
+        }
+        
         let parsable_message = message_response.into_string().unwrap();
 
         MailMessage::parse(&parsable_message)
@@ -255,15 +269,9 @@ impl GmailnatorInbox {
 
     fn get_tokened_query() -> UrlQuery {
 
-        let csrf_value = get_token_sync(); 
-
         let mut tokened_query = UrlQuery::new();
-
-        if csrf_value.is_none() {
-            return tokened_query;   
-        }
-
-        tokened_query.add("csrf_gmailnator_token", &csrf_value.unwrap());
+        
+        tokened_query.add("csrf_gmailnator_token", "");
 
         tokened_query
 
@@ -274,7 +282,7 @@ impl GmailnatorInbox {
         let server_id:Vec<&str> = mail_address.split('+').collect();
 
         if server_id.is_empty() {
-            return Err(GmailnatorError::MailServerParsingError(mail_address.to_string()));
+            return Err(Error::MailServerParsingError(mail_address.to_string()));
         }
 
         let server_id = server_id[0].to_string();

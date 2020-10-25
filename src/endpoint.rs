@@ -2,20 +2,17 @@ extern crate ureq;
 
 use ureq::Request;
 
-use crate::token::get_token_sync;
-
 impl GmailnatorEndpoint { //IMPLEMENT EP
 
     pub fn to_request(self) -> GmailnatorRequest {
 
         match self {
-
-            GmailnatorEndpoint::GetToken    => GmailnatorRequest::from(HttpMethod::Get, "https://gmailnator.com/"),
             
-            GmailnatorEndpoint::GetEmail    => GmailnatorRequest::from(HttpMethod::Post, "https://gmailnator.com/index/indexquery"),
+            GmailnatorEndpoint::GetEmail        => GmailnatorRequest::from(HttpMethod::Post, "https://gmailnator.com/index/indexquery"),
+            GmailnatorEndpoint::GetEmailBulk    => GmailnatorRequest::from(HttpMethod::Post, "https://gmailnator.com/bulk-emails"),
 
-            GmailnatorEndpoint::GetInbox    => GmailnatorRequest::from(HttpMethod::Post, "https://gmailnator.com/mailbox/mailboxquery"),
-            GmailnatorEndpoint::GetMessage  => GmailnatorRequest::from(HttpMethod::Post, "https://gmailnator.com/mailbox/get_single_message/"),
+            GmailnatorEndpoint::GetInbox        => GmailnatorRequest::from(HttpMethod::Post, "https://gmailnator.com/mailbox/mailboxquery"),
+            GmailnatorEndpoint::GetMessage      => GmailnatorRequest::from(HttpMethod::Post, "https://gmailnator.com/mailbox/get_single_message"),
         
         }
 
@@ -55,10 +52,10 @@ pub enum HttpMethod {
 #[derive(Copy, Clone, PartialEq)]
 pub enum GmailnatorEndpoint {
 
-    GetToken,
     GetEmail,
     GetInbox,
     GetMessage,
+    GetEmailBulk,
 
 }
 
@@ -75,21 +72,12 @@ pub fn get_request_from_endpoint(ep:GmailnatorEndpoint) -> Request {
 
     };
 
-    let csrf_value = get_token_sync();
-
-    if ep != GmailnatorEndpoint::GetToken && csrf_value.is_some() {
-
-        let auth_cookie = format!("csrf_gmailnator_cookie={}", csrf_value.unwrap());
-
-        base_req.set("Cookie", &auth_cookie);
-
-    }
+    base_req.set("Cookie", "csrf_gmailnator_cookie=;");
+    base_req.set("User-Agent", "Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36");
 
     if method == HttpMethod::Post {
         base_req.set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
     }
-
-    base_req.set("User-Agent", "Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36");
 
     base_req
 

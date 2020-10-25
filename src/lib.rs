@@ -18,6 +18,16 @@
 //! let address:&str = inbox.get_address();
 //! ```
 //! 
+//! This creates `n` number of addresses, it must be used to create a large number of inboxes.
+//! ```
+//! use gmailnator::GmailnatorInbox;
+//!
+//! let n:u32 = 500;
+//! let inboxes:Vec<GmailnatorInbox> = GmailnatorInbox::new_bulk(n).unwrap();
+//! 
+//! assert_eq!(inboxes.len() as u32, n); 
+//! ```
+//! 
 //! To retrieve messages and display them via the container struct [`MailMessage`]: 
 //! ```
 //! use gmailnator::{GmailnatorInbox, MailMessage};
@@ -45,7 +55,6 @@ mod mail;
 mod endpoint;
 mod regexes;
 mod http;
-mod token;
 
 pub use mail::{MailMessage, GmailnatorInbox, Error};
 pub use errors::GmailnatorError;
@@ -90,5 +99,34 @@ mod tests {
         assert_eq!(inbox.get_address(), new_address);
 
     }  
+
+    #[test]
+    fn create_bulk() {
+        
+        let count:u32 = 1;
+
+        let inboxes = GmailnatorInbox::new_bulk(count).unwrap();   
+
+        assert_eq!(inboxes.len() as u32, count);
+
+    }
+
+    #[test]
+    fn create_bulk_larger() {
+        
+        let count:u32 = 1000;
+
+        let inboxes = GmailnatorInbox::new_bulk(count).unwrap();   
+
+        assert_eq!(inboxes.len() as u32, count);
+
+    }
+
+    #[test]
+    fn create_bulk_invalid() {
+
+        assert!(GmailnatorInbox::new_bulk(0).is_err())
+
+    }
 
 }

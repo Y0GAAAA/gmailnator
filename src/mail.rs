@@ -10,6 +10,8 @@ use scraper::{Html, Selector};
 const MIN_BULK_COUNT:u32 = 1;
 const MAX_BULK_COUNT:u32 = 1000;
 
+const BODY_SPLITTER:&'static str = "<hr />"; 
+
 /// Default error for the crate.
 pub type Error = GmailnatorError;
 
@@ -56,13 +58,35 @@ impl MailMessage {
         let subject_item = subject_container.next();
         let body_item = body_container.next();
 
-        if subject_item.is_none() || body_item.is_none() {
+        if subject_item.is_none() {
             return Err(Error::HtmlParsingError(response_fragment.to_string()));
         }
 
-        let subject = subject_item.unwrap().inner_html();
-        let body = body_item.unwrap().inner_html();
+        let is_html_content = body_item.is_none();
 
+        let subject = subject_item.unwrap().inner_html();
+        
+        let body = match is_html_content {
+
+            false => body_item.unwrap().inner_html(),
+            true => {
+            
+                if let Some(mut start_index) = response_fragment.find(BODY_SPLITTER) {
+
+                    start_index += BODY_SPLITTER.len();
+
+                    response_fragment[start_index..].to_string()
+
+                } else {
+
+                    String::default()
+
+                }
+            
+            }
+
+        };
+        
         Ok(MailMessage::from(subject, body))
         
     }

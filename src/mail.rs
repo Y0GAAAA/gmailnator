@@ -22,7 +22,6 @@ pub type Error = GmailnatorError;
 pub struct MailMessage {
     subject:String,
     raw_content:String,
-    decoded_content:String,
 }
 
 lazy_static! {
@@ -76,12 +75,9 @@ impl MailMessage {
 
         };
         
-        let decoded_body = decode_html(&raw_body).unwrap_or_default();
-
         Ok(Self {
             subject,
             raw_content:raw_body,
-            decoded_content:decoded_body,
         })
         
     }
@@ -91,9 +87,15 @@ impl MailMessage {
         &self.subject
     }
 
-    /// Gets the html decoded content.
-    pub fn get_content(&self) -> &str {
-        &self.decoded_content
+    /// Decodes the raw content's html entities.
+    pub fn decode_content(&self) -> Result<String, Error> {
+    
+        if let Ok(decoded) = decode_html(&self.raw_content) {
+            Ok(decoded.to_string())
+        } else {
+            Err(Error::HtmlDecodingError)
+        }
+    
     }
 
     /// Gets the message's raw html content with potential html entities still encoded. 

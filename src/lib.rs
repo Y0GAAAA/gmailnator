@@ -136,7 +136,7 @@ mod tests {
 
         assert_eq!(message.get_subject(), "subject");
 
-        assert_eq!(message.get_content(), "content");
+        assert_eq!(message.decode_content().unwrap(), "content");
         assert_eq!(message.get_raw_content(), "content");
 
     }
@@ -380,7 +380,7 @@ mod tests {
 
         assert_eq!(message.get_raw_content(), confirmation_html_body);
         
-        assert_ne!(message.get_content(), confirmation_html_body); //Doesn't assert because there's a &copy; entity that gets decoded...
+        assert_ne!(message.decode_content().unwrap(), confirmation_html_body); //Doesn't assert because there's a &copy; entity that gets decoded...
 
     }
 

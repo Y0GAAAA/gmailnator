@@ -17,6 +17,9 @@ pub enum GmailnatorError {
     /// Gets returned uniquely by the GmailnatorInbox::new_bulk(count:u32) method if the count argument has an invalid value. 
     InvalidCountError(u32),
 
+    /// Gets returned when malformed html entities are found in an html document.
+    HtmlDecodingError,
+
 }
 
 impl Error for GmailnatorError {}
@@ -30,12 +33,11 @@ impl fmt::Display for GmailnatorError {
             GmailnatorError::ServerError(error_code) => format!("Server error-ed with status code : {}", error_code),
             GmailnatorError::HtmlParsingError(html) => format!("Error occured while parsing the following html element : {}", html),
             GmailnatorError::InvalidCountError(count_value) => format!("Count argument has an invalid value ({})", count_value),
+            GmailnatorError::HtmlDecodingError => "Malformed html entities were encountered.".to_string(),
         };
 
-        write!(f, "{}", error_message);
+        write!(f, "{}", error_message)
     
-        Ok(())
-
     }
 
 }

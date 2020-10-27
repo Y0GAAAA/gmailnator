@@ -37,9 +37,14 @@
 //! for message in messages {
 //! 
 //!     let title = message.get_subject();
-//!     let body = message.get_raw_content();
 //! 
-//!     println!("Title : {}\nBody : {}", title, body);
+//!     let raw_body = message.get_raw_content();
+//!     let decoded_body = message.decode_content().unwrap();
+//! 
+//!     // raw_body     = &lt;You&gt; Where did you put the &quot;thing&quot; ?
+//!     // decoded_body = <You> Where did you put the "thing" ?
+//! 
+//!     println!("Title : {}\nBody : {}", title, decoded_body);
 //! 
 //! }
 //! ```

@@ -59,6 +59,11 @@ pub enum GmailnatorEndpoint {
 
 }
 
+const EMPTY_CSRF_COOKIE:&'static str = "csrf_gmailnator_cookie=;";
+const DEFAULT_USER_AGENT:&'static str = "Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36";
+
+const URL_ENCODED_CONTENT_TYPE:&'static str = "application/x-www-form-urlencoded; charset=UTF-8";
+
 pub fn get_request_from_endpoint(ep:GmailnatorEndpoint) -> Request {
 
     let request_param = ep.to_request();
@@ -72,11 +77,11 @@ pub fn get_request_from_endpoint(ep:GmailnatorEndpoint) -> Request {
 
     };
 
-    base_req.set("Cookie", "csrf_gmailnator_cookie=;");
-    base_req.set("User-Agent", "Mozilla/5.0 (Windows NT 6.4; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2225.0 Safari/537.36");
+    base_req.set("Cookie", EMPTY_CSRF_COOKIE);
+    base_req.set("User-Agent", DEFAULT_USER_AGENT);
 
     if method == HttpMethod::Post {
-        base_req.set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
+        base_req.set("Content-Type", URL_ENCODED_CONTENT_TYPE); 
     }
 
     base_req

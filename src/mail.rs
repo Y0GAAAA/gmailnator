@@ -1,4 +1,5 @@
 extern crate scraper;
+extern crate htmlescape;
 
 use crate::endpoint::*;
 use crate::regexes::MAIL_ID_REGEX;
@@ -6,29 +7,21 @@ use crate::http::{UrlQuery, get_error};
 use crate::errors::GmailnatorError;
 
 use scraper::{Html, Selector};
- 
+use htmlescape::decode_html; 
+
 const MIN_BULK_COUNT:u32 = 1;
 const MAX_BULK_COUNT:u32 = 1000;
+
+const BODY_SPLITTER:&'static str = "<hr />"; 
 
 /// Default error for the crate.
 pub type Error = GmailnatorError;
 
-/// A structure that contains an e-mail subject and it's raw content, which can be accessed by the following two functions :
-/// ```
-/// use gmailnator::MailMessage;
-/// 
-/// let message:MailMessage = MailMessage::empty();
-/// 
-/// let subject:&str = message.get_subject();
-/// let content:&str = message.get_raw_content();
-/// 
-/// assert!(subject.is_empty());
-/// assert!(content.is_empty());
-/// ```
+/// A structure that contains an e-mail subject and its content under two forms : raw, and html decoded.
 #[derive(Debug)]
 pub struct MailMessage {
     subject:String,
-    content:String,
+    raw_content:String,
 }
 
 lazy_static! {
@@ -42,10 +35,6 @@ lazy_static! {
 
 impl MailMessage {
 
-    pub(crate) fn from(subject:String, content:String) -> Self {
-        Self { subject, content }
-    }
-
     pub(crate) fn parse(response_fragment:&str) -> Result<Self, Error> {
 
         let fragment = Html::parse_fragment(response_fragment);
@@ -56,23 +45,41 @@ impl MailMessage {
         let subject_item = subject_container.next();
         let body_item = body_container.next();
 
-        if subject_item.is_none() || body_item.is_none() {
+        if subject_item.is_none() {
             return Err(Error::HtmlParsingError(response_fragment.to_string()));
         }
 
+        let is_html_content = body_item.is_none();
+
         let subject = subject_item.unwrap().inner_html();
-        let body = body_item.unwrap().inner_html();
+        let subject = decode_html(&subject).unwrap_or_default();
 
-        Ok(MailMessage::from(subject, body))
+        let raw_body = match is_html_content {
+
+            false => body_item.unwrap().inner_html(),
+            true => {
+            
+                if let Some(mut start_index) = response_fragment.find(BODY_SPLITTER) {
+
+                    start_index += BODY_SPLITTER.len();
+
+                    response_fragment[start_index..].to_string()
+
+                } else {
+
+                    String::default()
+
+                }
+            
+            }
+
+        };
         
-    }
-
-    /// Returns an empty mail message.
-    pub fn empty() -> Self {
-        Self {
-            subject:String::default(),
-            content:String::default(),
-        }
+        Ok(Self {
+            subject,
+            raw_content:raw_body,
+        })
+        
     }
 
     /// Gets the message's subject.
@@ -80,9 +87,20 @@ impl MailMessage {
         &self.subject
     }
 
-    /// Gets the message's raw content.
+    /// Decodes the raw content's html entities.
+    pub fn decode_content(&self) -> Result<String, Error> {
+    
+        if let Ok(decoded) = decode_html(&self.raw_content) {
+            Ok(decoded.to_string())
+        } else {
+            Err(Error::HtmlDecodingError)
+        }
+    
+    }
+
+    /// Gets the message's raw html content with potential html entities still encoded. 
     pub fn get_raw_content(&self) -> &str {
-        &self.content
+        &self.raw_content
     }
 
 }

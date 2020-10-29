@@ -64,7 +64,7 @@ pub use mail::{MailMessage, GmailnatorInbox, Error};
 pub use errors::GmailnatorError;
 
 #[cfg(test)]
-mod tests {
+mod passive_tests {
 
     use crate::mail::{GmailnatorInbox, MailMessage};
 
@@ -82,13 +82,24 @@ mod tests {
     }
 
     #[test]
-    fn retrieve_messages() {
+    fn retrieve_messages_vec() {
         
         let inbox = GmailnatorInbox::new().expect("Failed to create an inbox."); 
 
         let messages = inbox.get_messages().expect("Failed to retrieve messages.");
 
         assert_eq!(messages.len(), 0);
+
+    }
+
+    #[test]
+    fn retrieve_messages_iter() {
+
+      let inbox = GmailnatorInbox::new().unwrap();
+
+      let mut message_iter = inbox.get_messages_iter().unwrap();
+
+      assert!(message_iter.next().is_none());
 
     }
 

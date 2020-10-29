@@ -177,36 +177,37 @@ impl GmailnatorInbox {
 
     }
 
-    /// Returns the received e-mail(s).
+    /// Returns the received e-mail(s) inside a vector.
     pub fn get_messages(&self) -> Result<Vec<MailMessage>, Error> {
 
-        let inbox_request = get_request_from_endpoint(GmailnatorEndpoint::GetInbox);
+        let message_ids = self.get_inbox_messages_id_collection()?;
 
-        let mut query = GmailnatorInbox::get_tokened_query();
-        
-        query.add("action", "LoadMailList");
-        query.add("Email_address", &self.mail_address);
+        let mut final_messages:Vec<MailMessage> = Vec::new();
 
-        let response_str = get_response_content(inbox_request, query)?;
+        for message_id in message_ids {
 
-        let mut inbox_messages:Vec<MailMessage> = Vec::new();
+            let message = GmailnatorInbox::get_message_by_id(&self.temp_server, &message_id)?;
 
-        // Gets first capture group where the mail id is stored
-        for id in MAIL_ID_REGEX.captures_iter(&response_str).map( |capture| capture.get(1).unwrap()) {
-
-            let final_id = id.as_str().to_string();
-
-            let message = self.get_message_by_id(&final_id);
-
-            if let Ok(legit_message) = message {
-
-                inbox_messages.push(legit_message);
-
-            }
+            final_messages.push(message);
 
         }
         
-        Ok(inbox_messages)
+        Ok(final_messages)
+
+    }
+
+    /// Returns the received e-mail(s) as an iterator.
+    /// It's only when calling `next()` on the iterator that the e-mail data will be queried. 
+    pub fn get_messages_iter(&self) -> Result<MailMessageIterator, Error> {
+
+        let message_ids = self.get_inbox_messages_id_collection()?;
+
+        let iter = MailMessageIterator {
+            message_ids,
+            temp_server_identifier:self.temp_server.clone(),
+        };
+
+        Ok(iter)
 
     }
 
@@ -239,7 +240,7 @@ impl GmailnatorInbox {
 
     }
 
-    fn get_message_by_id(&self, message_id:&str) -> Result<MailMessage, Error> {
+    fn get_message_by_id(server_identifier:&str, message_id:&str) -> Result<MailMessage, Error> {
 
         let get_message_request = get_request_from_endpoint(GmailnatorEndpoint::GetMessage);
 
@@ -247,7 +248,7 @@ impl GmailnatorInbox {
 
         get_message_query.add("action", "get_message");
         get_message_query.add("message_id", message_id);
-        get_message_query.add("email", &self.temp_server);
+        get_message_query.add("email", server_identifier);
         
         let parsable_message = get_response_content(get_message_request, get_message_query)?;
 
@@ -277,4 +278,53 @@ impl GmailnatorInbox {
 
     }
 
-} 
+    fn get_inbox_messages_id_collection(&self) -> Result<Vec<String>, Error> {
+
+        let inbox_request = get_request_from_endpoint(GmailnatorEndpoint::GetInbox);
+
+        let mut query = GmailnatorInbox::get_tokened_query();
+        
+        query.add("action", "LoadMailList");
+        query.add("Email_address", &self.mail_address);
+
+        let response_str = get_response_content(inbox_request, query)?;
+
+        let mut id_collection = Vec::<String>::new();
+
+        // Gets first capture group where the mail id is stored
+        for id in MAIL_ID_REGEX.captures_iter(&response_str).map( |capture| capture.get(1).unwrap()) {
+
+            let id = id.as_str().to_string();
+
+            id_collection.push(id);
+
+        }
+
+        Ok(id_collection)
+
+    }
+
+}
+
+pub struct MailMessageIterator {
+    message_ids:Vec<String>,
+    temp_server_identifier:String,
+}
+
+impl Iterator for MailMessageIterator {
+
+    type Item = MailMessage;
+
+    fn next(&mut self) -> Option<Self::Item> {
+
+        if let Some(id) = self.message_ids.pop() {
+
+            GmailnatorInbox::get_message_by_id(&self.temp_server_identifier, &id).ok()
+
+        } else {
+            None
+        }
+
+    }
+
+}

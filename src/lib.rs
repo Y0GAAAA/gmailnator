@@ -52,8 +52,7 @@
 #![warn(missing_docs)]
 #![warn(missing_doc_code_examples)]
 
-#[macro_use]
-extern crate lazy_static;
+#[macro_use] extern crate lazy_static;
 
 mod errors;
 mod mail;

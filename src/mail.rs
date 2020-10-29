@@ -3,7 +3,7 @@ extern crate htmlescape;
 
 use crate::endpoint::*;
 use crate::regexes::MAIL_ID_REGEX;
-use crate::http::{UrlQuery, get_error};
+use crate::http::{UrlQuery, get_response_content};
 use crate::errors::GmailnatorError;
 
 use scraper::{Html, Selector};
@@ -119,21 +119,13 @@ impl GmailnatorInbox {
     /// Creates a new inbox. 
     pub fn new() -> Result<Self, Error> {
         
-        let mut email_request = get_request_from_endpoint(GmailnatorEndpoint::GetEmail);
+        let email_request = get_request_from_endpoint(GmailnatorEndpoint::GetEmail);
         let mut mail_query = GmailnatorInbox::get_tokened_query();
         
         mail_query.add("action", "GenerateEmail");
         mail_query.add("data%5B%5D", "2");
  
-        let email_response = email_request.send_string(&mail_query.to_query_string());
-
-        if let Some(error_code) = get_error(&email_response) {
-        
-            return Err(Error::ServerError(error_code));
-
-        }
-
-        let response_str = email_response.into_string().unwrap();
+        let response_str = get_response_content(email_request, mail_query)?;
 
         let server_id = GmailnatorInbox::get_temp_server_id(&response_str)?;
 
@@ -154,22 +146,14 @@ impl GmailnatorInbox {
             return Err(Error::InvalidCountError(count));
         }
 
-        let mut bulk_request = get_request_from_endpoint(GmailnatorEndpoint::GetEmailBulk);
+        let bulk_request = get_request_from_endpoint(GmailnatorEndpoint::GetEmailBulk);
 
         let mut bulk_query = GmailnatorInbox::get_tokened_query();
 
         bulk_query.add("email_list", &(count - 1).to_string());
         bulk_query.add("email%5B%5D", "2");
 
-        let bulk_response = bulk_request.send_string(&bulk_query.to_query_string());
-
-        if let Some(error_code) = get_error(&bulk_response) {
-
-            return Err(Error::ServerError(error_code));
-
-        }
-
-        let response_str = bulk_response.into_string().unwrap();
+        let response_str = get_response_content(bulk_request, bulk_query)?;
 
         GmailnatorInbox::get_bulk_from_html(&response_str)
         
@@ -196,27 +180,19 @@ impl GmailnatorInbox {
     /// Returns the received e-mail(s).
     pub fn get_messages(&self) -> Result<Vec<MailMessage>, Error> {
 
-        let mut inbox_request = get_request_from_endpoint(GmailnatorEndpoint::GetInbox);
+        let inbox_request = get_request_from_endpoint(GmailnatorEndpoint::GetInbox);
 
         let mut query = GmailnatorInbox::get_tokened_query();
         
         query.add("action", "LoadMailList");
         query.add("Email_address", &self.mail_address);
 
-        let inbox_response = inbox_request.send_string(&query.to_query_string());
-
-        if let Some(error_code) = get_error(&inbox_response) {
-
-            return Err(Error::ServerError(error_code));
-
-        }
-
-        let response_str = inbox_response.into_string().unwrap();
+        let response_str = get_response_content(inbox_request, query)?;
 
         let mut inbox_messages:Vec<MailMessage> = Vec::new();
 
-        for id in MAIL_ID_REGEX.captures_iter(&response_str)
-                                    .map(|capture| capture.get(1).unwrap()) {
+        // Gets first capture group where the mail id is stored
+        for id in MAIL_ID_REGEX.captures_iter(&response_str).map( |capture| capture.get(1).unwrap()) {
 
             let final_id = id.as_str().to_string();
 
@@ -265,21 +241,15 @@ impl GmailnatorInbox {
 
     fn get_message_by_id(&self, message_id:&str) -> Result<MailMessage, Error> {
 
-        let mut get_message_request = get_request_from_endpoint(GmailnatorEndpoint::GetMessage);
+        let get_message_request = get_request_from_endpoint(GmailnatorEndpoint::GetMessage);
 
         let mut get_message_query = GmailnatorInbox::get_tokened_query();
 
         get_message_query.add("action", "get_message");
         get_message_query.add("message_id", message_id);
         get_message_query.add("email", &self.temp_server);
-
-        let message_response = get_message_request.send_string(&get_message_query.to_query_string());
-
-        if let Some(error_code) = get_error(&message_response) {
-            return Err(Error::ServerError(error_code));
-        }
         
-        let parsable_message = message_response.into_string().unwrap();
+        let parsable_message = get_response_content(get_message_request, get_message_query)?;
 
         MailMessage::parse(&parsable_message)
 
@@ -297,15 +267,13 @@ impl GmailnatorInbox {
 
     fn get_temp_server_id(mail_address:&str) -> Result<String, Error> {
 
-        let server_id:Vec<&str> = mail_address.split('+').collect();
+        let mut server_id = mail_address.split('+');
 
-        if server_id.is_empty() {
+        if let Some(identifier) = server_id.next() {
+            Ok(identifier.to_string())
+        } else {
             return Err(Error::MailServerParsingError(mail_address.to_string()));
         }
-
-        let server_id = server_id[0].to_string();
-
-        Ok(server_id)
 
     }
 

@@ -2,7 +2,8 @@ extern crate url;
 extern crate ureq;
 
 use url::form_urlencoded::byte_serialize;
-use ureq::Response;
+use ureq::{Response, Request};
+use crate::mail::Error;
 
 pub fn url_encode(s:&str) -> String {
 
@@ -22,6 +23,20 @@ pub fn get_error(server_response:&Response) -> Option<u16> {
 
         None
 
+    }
+
+}
+
+pub fn get_response_content(mut request:Request, query:UrlQuery) -> Result<String, Error> {
+
+    let payload = &query.to_query_string();
+
+    let response = request.send_string(payload);
+
+    if let Some(error_code) = get_error(&response) {
+        Err(Error::ServerError(error_code))
+    } else {
+        Ok(response.into_string().unwrap_or_default())
     }
 
 }

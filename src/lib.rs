@@ -1,5 +1,6 @@
 //! [`GmailnatorInbox`]: struct.GmailnatorInbox.html
 //! [`MailMessage`]: struct.MailMessage.html
+//! [`MailMessageIterator`]: struct.MailMessageIterator.html
 //! This library contains objects to create a gmailnator inbox and read the messages it contains.
 //! # Getting started : 
 //! The main struct is the [`GmailnatorInbox`] struct, one instance contains one inbox associated to an email address.
@@ -28,11 +29,12 @@
 //! assert_eq!(inboxes.len() as u32, n); 
 //! ```
 //! 
-//! To retrieve messages and display them via the container struct [`MailMessage`]: 
+//! To retrieve messages and display them via the container struct [`MailMessage`]:
+//! This method requests every message's subject & body, if you don't necessarily need every message in the inbox : consider using `get_messages_iter()` to save resources. 
 //! ```
 //! use gmailnator::{GmailnatorInbox, MailMessage};
 //! # let inbox = GmailnatorInbox::new().unwrap();
-//! let messages:Vec<MailMessage> = inbox.get_messages().expect("Failed to retrieve messages.");
+//! let messages:Vec<MailMessage> = inbox.get_messages().unwrap();
 //! 
 //! for message in messages {
 //! 
@@ -48,6 +50,22 @@
 //! 
 //! }
 //! ```
+//! 
+//! To search for a particular message, use the [`MailMessageIterator`] :
+//! ```
+//! use gmailnator::{GmailnatorInbox, MailMessage};
+//! # let inbox = GmailnatorInbox::new().unwrap();
+//! let mut messages_iter = inbox.get_messages_iter().unwrap();
+//!
+//! let find_result = messages_iter.find(|m| m.get_subject() == "Confirm your order");
+//! 
+//! if let Some(confirmation_message) = find_result {
+//! 
+//!   //Confirm your order :)
+//! 
+//! }
+//!  ```
+
 
 #![warn(missing_docs)]
 #![warn(missing_doc_code_examples)]
@@ -60,7 +78,7 @@ mod endpoint;
 mod regexes;
 mod http;
 
-pub use mail::{MailMessage, GmailnatorInbox, Error};
+pub use mail::{MailMessage, GmailnatorInbox, MailMessageIterator, Error};
 pub use errors::GmailnatorError;
 
 #[cfg(test)]

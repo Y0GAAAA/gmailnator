@@ -9,11 +9,6 @@ use crate::errors::GmailnatorError;
 use scraper::{Html, Selector};
 use htmlescape::decode_html; 
 
-const MIN_BULK_COUNT:u32 = 1;
-const MAX_BULK_COUNT:u32 = 1000;
-
-const BODY_SPLITTER:&'static str = "<hr />"; 
-
 /// Default error for the crate.
 pub type Error = GmailnatorError;
 
@@ -34,6 +29,8 @@ lazy_static! {
 }
 
 impl MailMessage {
+
+    const BODY_SPLITTER:&'static str = "<hr />"; 
 
     pub(crate) fn parse(response_fragment:&str) -> Result<Self, Error> {
 
@@ -59,9 +56,9 @@ impl MailMessage {
             false => body_item.unwrap().inner_html(),
             true => {
             
-                if let Some(mut start_index) = response_fragment.find(BODY_SPLITTER) {
+                if let Some(mut start_index) = response_fragment.find(MailMessage::BODY_SPLITTER) {
 
-                    start_index += BODY_SPLITTER.len();
+                    start_index += MailMessage::BODY_SPLITTER.len();
 
                     response_fragment[start_index..].to_string()
 
@@ -116,6 +113,9 @@ pub struct GmailnatorInbox {
 
 impl GmailnatorInbox {
 
+    const MIN_BULK_COUNT:u32 = 1;
+    const MAX_BULK_COUNT:u32 = 1000;
+
     /// Creates a new inbox. 
     pub fn new() -> Result<Self, Error> {
         
@@ -142,7 +142,8 @@ impl GmailnatorInbox {
     /// The `count` argument must be between 1 and 1000 included. 
     pub fn new_bulk(count:u32) -> Result<Vec<Self>, Error> {
 
-        if count < MIN_BULK_COUNT || count > MAX_BULK_COUNT {
+        if count < GmailnatorInbox::MIN_BULK_COUNT 
+        || count > GmailnatorInbox::MAX_BULK_COUNT {
             return Err(Error::InvalidCountError(count));
         }
 

@@ -4,7 +4,7 @@ extern crate htmlescape;
 use crate::endpoint::*;
 use crate::regexes::MAIL_ID_REGEX;
 use crate::http::{UrlQuery, get_response_content};
-use crate::errors::GmailnatorError;
+use crate::errors::GmailnatorError; 
 
 use scraper::{Html, Selector};
 use htmlescape::decode_html; 

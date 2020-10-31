@@ -53,9 +53,9 @@
 //! 
 //! To search for a particular message, use the [`MailMessageIterator`] :
 //! ```
-//! use gmailnator::{GmailnatorInbox, MailMessage};
+//! use gmailnator::{GmailnatorInbox, MailMessage, MailMessageIterator};
 //! # let inbox = GmailnatorInbox::new().unwrap();
-//! let mut messages_iter = inbox.get_messages_iter().unwrap();
+//! let mut messages_iter:MailMessageIterator = inbox.get_messages_iter().unwrap();
 //!
 //! let find_result = messages_iter.find(|m| m.get_subject() == "Confirm your order");
 //! 

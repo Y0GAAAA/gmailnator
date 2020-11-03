@@ -307,7 +307,7 @@ impl GmailnatorInbox {
 
 }
 
-/// `MailMessageIterator` is an `Iterator`, it's goal is to reduce resource consumption by only requesting message subject and content to the server when `next()` is called, unlike a `get_messages()` call which can be quiet expensive and time consuming.
+/// `MailMessageIterator` is an `Iterator`, it's goal is to reduce resource consumption by only requesting message subject and content to the server when `next()` is called, unlike a `get_messages()` call which can be quite expensive and time consuming.
 pub struct MailMessageIterator {
     message_ids:Vec<String>,
     temp_server_identifier:String,

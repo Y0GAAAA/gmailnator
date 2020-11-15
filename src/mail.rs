@@ -1,19 +1,21 @@
 extern crate scraper;
 extern crate htmlescape;
+extern crate serde;
 
 use crate::endpoint::*;
 use crate::regexes::MAIL_ID_REGEX;
 use crate::http::{UrlQuery, get_response_content};
 use crate::errors::GmailnatorError; 
 
+use serde::{Serialize, Deserialize};
 use scraper::{Html, Selector};
 use htmlescape::decode_html; 
 
 /// Default error for the crate.
 pub type Error = GmailnatorError;
 
-/// A structure that contains an e-mail subject and its content under two forms : raw, and html decoded.
-#[derive(Debug)]
+/// A structure that contains an e-mail subject and its raw content which the `decode_content()` method can decode.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MailMessage {
     subject:String,
     raw_content:String,
@@ -31,6 +33,10 @@ lazy_static! {
 impl MailMessage {
 
     const BODY_SPLITTER:&'static str = "<hr />"; 
+
+    pub(crate) fn new(subject:String, raw_content:String) -> Self {
+        Self {subject, raw_content}
+    }
 
     pub(crate) fn parse(response_fragment:&str) -> Result<Self, Error> {
 
@@ -72,10 +78,7 @@ impl MailMessage {
 
         };
         
-        Ok(Self {
-            subject,
-            raw_content:raw_body,
-        })
+        Ok(MailMessage::new(subject, raw_body))
         
     }
 
@@ -175,25 +178,6 @@ impl GmailnatorInbox {
             mail_address:address.to_string(),
             temp_server:temp_server_id,
         })
-
-    }
-
-    /// Returns the received e-mail(s) inside a vector.
-    pub fn get_messages(&self) -> Result<Vec<MailMessage>, Error> {
-
-        let message_ids = self.get_inbox_messages_id_collection()?;
-
-        let mut final_messages:Vec<MailMessage> = Vec::new();
-
-        for message_id in message_ids {
-
-            let message = GmailnatorInbox::get_message_by_id(&self.temp_server, &message_id)?;
-
-            final_messages.push(message);
-
-        }
-        
-        Ok(final_messages)
 
     }
 
@@ -307,7 +291,7 @@ impl GmailnatorInbox {
 
 }
 
-/// `MailMessageIterator` is an `Iterator`, it's goal is to reduce resource consumption by only requesting message subject and content to the server when `next()` is called, unlike a `get_messages()` call which can be quite expensive and time consuming.
+/// An `Iterator` whose purpose is to reduce resource consumption by only requesting message subject and content to the server when `next()` is called.
 pub struct MailMessageIterator {
     message_ids:Vec<String>,
     temp_server_identifier:String,

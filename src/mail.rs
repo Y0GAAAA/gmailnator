@@ -11,6 +11,15 @@ use serde::{Serialize, Deserialize};
 use scraper::{Html, Selector};
 use htmlescape::decode_html; 
 
+lazy_static! {
+
+    static ref SUBJECT_SELECTOR:Selector = Selector::parse("b").unwrap();
+    static ref BODY_SELECTOR:Selector = Selector::parse("div:nth-child(4)").unwrap();
+
+    static ref BULK_EMAIL_SELECTOR:Selector = Selector::parse("#email-list-message > a").unwrap();
+
+}
+
 /// Default error for the crate.
 pub type Error = GmailnatorError;
 
@@ -19,15 +28,6 @@ pub type Error = GmailnatorError;
 pub struct MailMessage {
     subject:String,
     raw_content:String,
-}
-
-lazy_static! {
-
-    static ref SUBJECT_SELECTOR:Selector = Selector::parse("b").unwrap();
-    static ref BODY_SELECTOR:Selector = Selector::parse("div:nth-child(4)").unwrap();
-
-    static ref BULK_EMAIL_SELECTOR:Selector = Selector::parse("#email-list-message > a").unwrap();
-
 }
 
 impl MailMessage {
@@ -70,8 +70,8 @@ impl MailMessage {
 
                 } else {
 
-                    String::default()
-
+                    return Err(Error::HtmlParsingError(response_fragment.to_string()))
+                    
                 }
             
             }
@@ -106,7 +106,7 @@ impl MailMessage {
 }
 
 /// The library's main object, when instantiated represents a gmailnator inbox associated to an e-mail address.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GmailnatorInbox {
 
     mail_address:String,    //COMPLETE E-MAIL | Ex : extmp+blabla@gmail.com

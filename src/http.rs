@@ -1,6 +1,3 @@
-extern crate url;
-extern crate ureq;
-
 use url::form_urlencoded::byte_serialize;
 use ureq::{Response, Request};
 use crate::mail::Error;

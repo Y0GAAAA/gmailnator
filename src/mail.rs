@@ -1,7 +1,3 @@
-extern crate scraper;
-extern crate htmlescape;
-extern crate serde;
-
 use crate::endpoint::*;
 use crate::regexes::MAIL_ID_REGEX;
 use crate::http::{UrlQuery, get_response_content};
@@ -10,11 +6,14 @@ use crate::errors::GmailnatorError;
 use serde::{Serialize, Deserialize};
 use scraper::{Html, Selector};
 use htmlescape::decode_html; 
+use serde_json::from_str;
+
+//use futures::;
 
 lazy_static! {
 
     static ref SUBJECT_SELECTOR:Selector = Selector::parse("b").unwrap();
-    static ref BODY_SELECTOR:Selector = Selector::parse("div:nth-child(4)").unwrap();
+    static ref BODY_SELECTOR:Selector = Selector::parse("div").unwrap();
 
     static ref BULK_EMAIL_SELECTOR:Selector = Selector::parse("#email-list-message > a").unwrap();
 
@@ -30,9 +29,13 @@ pub struct MailMessage {
     raw_content:String,
 }
 
-impl MailMessage {
+#[derive(Deserialize)]
+struct JsonMailMessage {
+    subject:String,
+    content:String,
+}
 
-    const BODY_SPLITTER:&'static str = "<hr />"; 
+impl MailMessage {
 
     pub(crate) fn new(subject:String, raw_content:String) -> Self {
         Self {subject, raw_content}
@@ -40,10 +43,18 @@ impl MailMessage {
 
     pub(crate) fn parse(response_fragment:&str) -> Result<Self, Error> {
 
-        let fragment = Html::parse_fragment(response_fragment);
+        let json_content:JsonMailMessage = match from_str(response_fragment) {
 
-        let mut subject_container = fragment.select(&SUBJECT_SELECTOR);
-        let mut body_container = fragment.select(&BODY_SELECTOR);
+            Ok(message) => message,
+            Err(_) => { return Err(Error::JsonParsingError(response_fragment.to_string())); }
+
+        };
+
+        let subject_fragment = Html::parse_fragment(&json_content.subject);
+        let content_fragment = Html::parse_fragment(&json_content.content);
+
+        let mut subject_container = subject_fragment.select(&SUBJECT_SELECTOR);
+        let mut body_container = content_fragment.select(&BODY_SELECTOR);
 
         let subject_item = subject_container.next();
         let body_item = body_container.next();
@@ -59,22 +70,8 @@ impl MailMessage {
 
         let raw_body = match is_html_content {
 
+            true => json_content.content,
             false => body_item.unwrap().inner_html(),
-            true => {
-            
-                if let Some(mut start_index) = response_fragment.find(MailMessage::BODY_SPLITTER) {
-
-                    start_index += MailMessage::BODY_SPLITTER.len();
-
-                    response_fragment[start_index..].to_string()
-
-                } else {
-
-                    return Err(Error::HtmlParsingError(response_fragment.to_string()))
-                    
-                }
-            
-            }
 
         };
         
@@ -140,7 +137,7 @@ impl GmailnatorInbox {
         );
 
     }
-
+ 
     /// Creates the desired amount of inbox.
     /// The `count` argument must be between 1 and 1000 included. 
     pub fn new_bulk(count:u32) -> Result<Vec<Self>, Error> {

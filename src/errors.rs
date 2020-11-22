@@ -20,6 +20,9 @@ pub enum GmailnatorError {
     /// Gets returned when malformed html entities are found in an html document.
     HtmlDecodingError,
 
+    /// Stores the invalid Json returned by the server.
+    JsonParsingError(String),
+
 }
 
 impl Error for GmailnatorError {}
@@ -34,6 +37,7 @@ impl fmt::Display for GmailnatorError {
             GmailnatorError::HtmlParsingError(html) => format!("Error occured while parsing the following html element : {}", html),
             GmailnatorError::InvalidCountError(count_value) => format!("Count argument has an invalid value ({})", count_value),
             GmailnatorError::HtmlDecodingError => "Malformed html entities were encountered.".to_string(),
+            GmailnatorError::JsonParsingError(json) => format!("Invalid json string : {}", json),
         };
 
         write!(f, "{}", error_message)

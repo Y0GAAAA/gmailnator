@@ -1,5 +1,3 @@
-extern crate regex;
-
 use regex::Regex;
 
 lazy_static! {

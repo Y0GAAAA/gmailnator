@@ -1,5 +1,3 @@
-extern crate ureq;
-
 use ureq::Request;
 
 impl GmailnatorEndpoint { //IMPLEMENT EP
